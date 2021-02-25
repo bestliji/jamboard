@@ -12,13 +12,16 @@ import ListItemText from "@material-ui/core/ListItemText"
 import Paper from "@material-ui/core/Paper"
 import TextField from "@material-ui/core/TextField"
 import * as StorageManager from "../StorageManager.js"
+import { Backdrop, CircularProgress } from "@material-ui/core"
 
 let mr = null
 let fm = null
 let currentMarkerKey = null
+let currentMarkerText = ""
 
 let state = { addCommentButtonDisabled : true, 
               addCommentDialogVisible : false,
+              spinnerVisible : false,
               newComment : "",
               comments : [] }
 
@@ -30,6 +33,7 @@ export default class Template extends React.Component {
     mr = inProps.data.markdownRemark
     fm = mr.frontmatter
     global.showComments = global.showComments.bind(this)
+    global.maskScreen = global.maskScreen.bind(this)
     addComment = addComment.bind(this)
     handleDialogClose = handleDialogClose.bind(this)
   }
@@ -39,6 +43,9 @@ export default class Template extends React.Component {
   render() {
     return (
       <div style={{display: "flex", flexDirection:"column", height:"96vh"}}>
+        <Backdrop style={{ color : "#ffffff", zIndex : "999" }} open={state.spinnerVisible}>
+          <CircularProgress color="inherit" />
+        </Backdrop>
         <Dialog open={state.addCommentDialogVisible} onClose={handleDialogClose} maxWidth="lg" fullWidth={true}>
           <DialogTitle>Add Comment</DialogTitle>
           <DialogContent>
@@ -78,7 +85,7 @@ export default class Template extends React.Component {
         <Paper elevation={5} style={{ margin : "10px", padding : "4px", height : "30vh", overflow : "auto" }}>
           <div style={{ fontWeight : "bold", position : "sticky", top : "2px", padding : "10px",
               backgroundColor : "#eaeaea", zIndex : 99 }}>
-            { currentMarkerKey === null ? "" : StorageManager.getMarkerFromStorage(currentMarkerKey).markerText}
+            { currentMarkerText }
           </div>
           <Grid container>
             <Grid item xs>
@@ -103,16 +110,16 @@ export default class Template extends React.Component {
   }
 }    
 
-function loadMarkers() {
-  const markerKeys = StorageManager.getAllMarkerKeysFromStorage(fm.id)
+async function loadMarkers() {
+  const markerKeys = await StorageManager.getAllMarkerKeysFromStorage(fm.id)
   markerKeys.forEach(function(inKey) {
     console.log(inKey)
     linkifyMarker(inKey)
   })
 }
 
-function linkifyMarker(inKey) {
-  let marker = StorageManager.getMarkerFromStorage(inKey)
+async function linkifyMarker(inKey) {
+  let marker =  await StorageManager.getMarkerFromStorage(inKey)
   const textNodes = []
   let node = document.body.childNodes[0]
   while (node != null) {
@@ -147,9 +154,10 @@ function linkifyMarker(inKey) {
   document.getSelection().removeAllRanges()
 }
 
-  global.showComments = function(inKey) {
+  global.showComments = async function(inKey) {
     currentMarkerKey = inKey
-    const marker = StorageManager.getMarkerFromStorage(inKey)
+    const marker = await StorageManager.getMarkerFromStorage(inKey)
+    currentMarkerText = marker.markerText
     state.comments.length = 0
     state.addCommentButtonDisabled = false
     marker.comments.forEach(
@@ -159,7 +167,7 @@ function linkifyMarker(inKey) {
     this.setState((inState, inProps) => { return state } ) 
   }
 
-  function addMarker() {
+  async function addMarker() {
     let range = null
     if (window.getSelection().rangeCount !== 0 ) {
       range = window.getSelection().getRangeAt(0)
@@ -173,10 +181,10 @@ function linkifyMarker(inKey) {
       comments: []
     }
     console.log(marker.parentNodeData)
-    const key = `${fm.id}-${new Date().getTime()}`
-    StorageManager.saveMarkerToStorage(key, marker)
+    const key = `${fm.id}${new Date().getTime()}`
+    await StorageManager.saveMarkerToStorage(key, marker)
     document.getSelection().removeAllRanges()
-    linkifyMarker(key)
+    await linkifyMarker(key)
   }
 
   // function addComment() {
@@ -203,20 +211,25 @@ function linkifyMarker(inKey) {
 
   }
 
-  function handleDialogSave() {
+  async function handleDialogSave() {
     handleDialogClose()
     if (state.newComment === null || state.newComment.trim() === "") {
       return;
     }
-    const marker = StorageManager.getMarkerFromStorage( currentMarkerKey )
-    console.log(marker)
+    const marker = await StorageManager.getMarkerFromStorage( currentMarkerKey )
+    // console.log(marker)
     marker.comments.push({
       author : localStorage.getItem("username"),
       dateTime : new Date().toLocaleDateString(),
       comment : state.newComment
     })
-    StorageManager.saveMarkerToStorage(currentMarkerKey, marker)
-    global.showComments(currentMarkerKey)
+    await StorageManager.saveMarkerToStorage(currentMarkerKey, marker, true)
+    await global.showComments(currentMarkerKey)
+  }
+
+  global.maskScreen = function(inMask) {
+    state.spinnerVisible = inMask
+    this.setState((inState, inProps) => { return state })
   }
 
   export const pageQuery = graphql`
