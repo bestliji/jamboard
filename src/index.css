@@ -1,0 +1,22 @@
+.outerContainer { 
+  margin : auto;
+  width : 600px; 
+  text-align : center;
+}
+
+.documentListLabel { 
+  color : #0000ff; 
+  font-weight : bold; 
+  margin-top : 20px; 
+  margin-bottom : 20px;
+}
+
+.documentDiv {
+  width : 600px; 
+  margin-bottom : 10px; 
+  background-color : #eaeaea;
+}
+
+a:hover {
+  color : #ffff00;
+}
